@@ -1,0 +1,37 @@
+{
+  "name": "glm53-flash",
+  "image": "vllm/vllm-openai:glm53-flash-x86_64-cu129",
+  "cloud": "SECURE",
+  "dataCenterIds": [
+    "EU-FR-1"
+  ],
+  "gpu": {
+    "id": "NVIDIA H200",
+    "count": 4,
+    "allowedCudaVersions": [
+      "12.8",
+      "12.9",
+      "13.0"
+    ]
+  },
+  "disk": 100,
+  "ports": [
+    "8000/http",
+    "22/tcp"
+  ],
+  "startSsh": true,
+  "env": {
+    "HF_HOME": "/workspace/hf",
+    "HF_HUB_ENABLE_HF_TRANSFER": "1",
+    "PUBLIC_KEY": "ssh-ed25519 AAAA... you@host"
+  },
+  "mounts": {
+    "network": [
+      {
+        "volumeId": "hb0s5jftdw",
+        "path": "/workspace"
+      }
+    ]
+  },
+  "args": "--model /workspace/models/GLM-5.3-Flash --served-model-name glm53 --tensor-parallel-size 4 --max-model-len 65536 --api-key YOUR_SECRET_KEY --enable-auto-tool-choice --tool-call-parser glm47 --reasoning-parser glm45 --host 0.0.0.0 --port 8000"
+}

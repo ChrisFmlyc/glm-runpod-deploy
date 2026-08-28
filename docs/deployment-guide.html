@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Manual deployment guide for GLM-5.3-Flash and its uncensored variant on RunPod: console and CLI paths, context tuning, and every bug encountered.">
+<meta name="color-scheme" content="light dark">
+<title>GLM-5.3-Flash Runbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#F7F8FA;
+  --surface:#FFFFFF;
+  --surface-2:#EFF2F6;
+  --ink:#16191F;
+  --ink-2:#39414E;
+  --muted:#5A6472;
+  --border:#DDE1E8;
+  --border-strong:#C3CAD5;
+  --accent:#BF3F1B;
+  --accent-soft:#FBEDE8;
+  --ok:#0F766E;
+  --ok-soft:#E4F2F0;
+  --warn:#9A5B08;
+  --warn-soft:#FBF0DF;
+  --bad:#A8231D;
+  --bad-soft:#FBEAE9;
+  --code-bg:#12151B;
+  --code-ink:#DFE4EC;
+  --code-dim:#7C8798;
+  --shadow:0 1px 2px rgba(22,25,31,.05),0 8px 24px -12px rgba(22,25,31,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1116;
+    --surface:#151920;
+    --surface-2:#1C222B;
+    --ink:#E7EAF0;
+    --ink-2:#C2C9D5;
+    --muted:#8C97A8;
+    --border:#262D38;
+    --border-strong:#39424F;
+    --accent:#FF7A4D;
+    --accent-soft:#2A1810;
+    --ok:#4FC7B6;
+    --ok-soft:#10241F;
+    --warn:#E0A54A;
+    --warn-soft:#241B0D;
+    --bad:#F2756C;
+    --bad-soft:#2A1413;
+    --code-bg:#090C11;
+    --code-ink:#DFE4EC;
+    --code-dim:#6C7789;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1116;
+  --surface:#151920;
+  --surface-2:#1C222B;
+  --ink:#E7EAF0;
+  --ink-2:#C2C9D5;
+  --muted:#8C97A8;
+  --border:#262D38;
+  --border-strong:#39424F;
+  --accent:#FF7A4D;
+  --accent-soft:#2A1810;
+  --ok:#4FC7B6;
+  --ok-soft:#10241F;
+  --warn:#E0A54A;
+  --warn-soft:#241B0D;
+  --bad:#F2756C;
+  --bad-soft:#2A1413;
+  --code-bg:#090C11;
+  --code-ink:#DFE4EC;
+  --code-dim:#6C7789;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px;
+  line-height:1.62;
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:Archivo,system-ui,sans-serif;text-wrap:balance;margin:0;line-height:1.18}
+p{margin:0}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px 96px}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1px solid var(--border);padding:56px 0 34px;margin-bottom:44px}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:18px
+}
+.mast h1{font-size:clamp(2.1rem,4.6vw,3.4rem);font-weight:700;letter-spacing:-.022em;max-width:20ch}
+.mast .lede{margin-top:18px;font-size:1.075rem;color:var(--ink-2);max-width:66ch}
+.mast .meta{
+  margin-top:24px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+  color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 20px
+}
+
+/* ---------- spec strip ---------- */
+.specs{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:1px;background:var(--border);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;margin-top:34px
+}
+.spec{background:var(--surface);padding:15px 17px}
+.spec dt{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px
+}
+.spec dd{
+  margin:0;font-family:Archivo,sans-serif;font-weight:600;font-size:1.2rem;
+  letter-spacing:-.01em;font-variant-numeric:tabular-nums
+}
+.spec dd span{font-size:.72rem;font-weight:500;color:var(--muted);margin-left:3px}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:1fr;gap:48px}
+@media (min-width:1040px){
+  .layout{grid-template-columns:212px minmax(0,1fr);gap:56px;align-items:start}
+  .rail{position:sticky;top:28px;max-height:calc(100vh - 56px);overflow-y:auto}
+}
+.rail nav{border-left:2px solid var(--border);display:flex;flex-direction:column}
+.rail a{
+  display:block;padding:6px 0 6px 16px;margin-left:-2px;
+  border-left:2px solid transparent;color:var(--muted);
+  font-size:13.5px;text-decoration:none;line-height:1.35
+}
+.rail a:hover{color:var(--ink);border-left-color:var(--border-strong)}
+.rail .rail-num{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--accent);
+  display:inline-block;width:20px
+}
+
+/* ---------- sections ---------- */
+section{scroll-margin-top:24px}
+section + section{margin-top:60px}
+.sec-head{display:flex;gap:14px;align-items:baseline;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.sec-num{
+  font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);
+  font-weight:500;flex:none;padding-top:3px
+}
+.sec-head h2{font-size:1.5rem;font-weight:600;letter-spacing:-.015em}
+.prose{max-width:68ch;display:flex;flex-direction:column;gap:15px}
+.prose h3{font-size:1.06rem;font-weight:600;margin-top:14px;letter-spacing:-.005em}
+.prose ul,.prose ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:7px}
+.prose li::marker{color:var(--muted)}
+strong{font-weight:600}
+code{
+  font-family:"IBM Plex Mono",monospace;font-size:.875em;
+  background:var(--surface-2);padding:1.5px 5px;border-radius:3px;
+  border:1px solid var(--border)
+}
+
+/* ---------- steps ---------- */
+.steps{display:flex;flex-direction:column;gap:26px;counter-reset:step}
+.step{
+  background:var(--surface);border:1px solid var(--border);border-radius:9px;
+  padding:22px 24px;box-shadow:var(--shadow);position:relative
+}
+.step-head{display:flex;gap:13px;align-items:baseline;margin-bottom:12px}
+.step-n{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  color:var(--surface);background:var(--accent);border-radius:4px;
+  padding:3px 7px;flex:none;letter-spacing:.04em
+}
+.step h3{font-size:1.06rem;font-weight:600}
+.step-body{display:flex;flex-direction:column;gap:13px;max-width:66ch}
+.step-body ul,.step-body ol{margin:0;padding-left:21px;display:flex;flex-direction:column;gap:6px}
+
+/* ---------- code ---------- */
+.code{
+  background:var(--code-bg);border-radius:8px;overflow:hidden;
+  border:1px solid var(--border);max-width:100%
+}
+.code-lab{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--code-dim);
+  padding:9px 15px;border-bottom:1px solid rgba(255,255,255,.07)
+}
+.code pre{
+  margin:0;padding:15px;overflow-x:auto;
+  font-family:"IBM Plex Mono",monospace;font-size:12.9px;line-height:1.65;
+  color:var(--code-ink)
+}
+.code .c{color:var(--code-dim)}
+.code .k{color:#F2A07B}
+.code .s{color:#8FD3C4}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th{
+  text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  font-weight:500;padding:11px 15px;border-bottom:1px solid var(--border);
+  white-space:nowrap;background:var(--surface-2)
+}
+td{padding:11px 15px;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.mono,th.mono{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+
+/* ---------- pills ---------- */
+.pill{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase;padding:2.5px 8px;border-radius:20px;
+  white-space:nowrap;font-weight:500
+}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.no{background:var(--bad-soft);color:var(--bad)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* ---------- callouts ---------- */
+.note{
+  border-radius:8px;padding:15px 18px;font-size:14.5px;
+  display:flex;flex-direction:column;gap:8px;max-width:68ch;
+  border:1px solid var(--border);background:var(--surface)
+}
+.note .nlab{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;font-weight:500
+}
+.note.stop{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 26%,transparent)}
+.note.stop .nlab{color:var(--bad)}
+.note.care{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 26%,transparent)}
+.note.care .nlab{color:var(--warn)}
+.note.good{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 26%,transparent)}
+.note.good .nlab{color:var(--ok)}
+
+/* ---------- bugs ---------- */
+.bugs{display:flex;flex-direction:column;gap:16px}
+.bug{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:9px;overflow:hidden
+}
+.bug-top{
+  display:flex;gap:12px;align-items:baseline;padding:15px 20px 12px;
+  border-bottom:1px solid var(--border);flex-wrap:wrap
+}
+.bug-id{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+  color:var(--accent);flex:none
+}
+.bug-top h3{font-size:1rem;font-weight:600;flex:1;min-width:200px}
+.bug-grid{display:grid;grid-template-columns:1fr;gap:0}
+@media (min-width:720px){.bug-grid{grid-template-columns:auto 1fr}}
+.bug-k{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);padding:13px 6px 4px 20px;white-space:nowrap
+}
+@media (min-width:720px){.bug-k{padding:13px 0 13px 20px;width:88px}}
+.bug-v{padding:0 20px 13px;font-size:14.3px}
+@media (min-width:720px){.bug-v{padding:13px 20px 13px 18px}}
+.bug-grid > div{border-bottom:1px solid var(--border)}
+@media (min-width:720px){
+  .bug-grid > .bug-k{border-bottom:1px solid var(--border)}
+}
+.bug-grid > div:nth-last-child(-n+2){border-bottom:none}
+
+.foot{
+  margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  font-size:13.5px;color:var(--muted);max-width:68ch;
+  display:flex;flex-direction:column;gap:10px
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style>
+html{-webkit-text-size-adjust:100%}
+img,svg,video{max-width:100%;height:auto;display:block}
+table{border-spacing:0}
+button,input,select,textarea{font:inherit;color:inherit}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Deployment Runbook · RunPod · vLLM</div>
+  <h1>GLM-5.3-Flash on RunPod</h1>
+  <p class="lede">A 321-billion-parameter multimodal MoE, served on four GPUs — plus the abliterated variant. Every step is manual: console clicks and shell commands, no automation required. The bugs section exists because a clean run is not the default.</p>
+  <div class="meta">
+    <span>Verified 2026-08-27</span>
+    <span>vLLM 0.1.dev20051+g487ecf187</span>
+    <span>FlashInfer 0.6.17</span>
+    <span>4 × H200 SXM</span>
+  </div>
+
+  <dl class="specs">
+    <div class="spec"><dt>Parameters</dt><dd>321.3<span>B</span></dd></div>
+    <div class="spec"><dt>Active / token</dt><dd>18<span>B</span></dd></div>
+    <div class="spec"><dt>Weights on disk</dt><dd>306<span>GiB</span></dd></div>
+    <div class="spec"><dt>Min VRAM</dt><dd>~340<span>GiB</span></dd></div>
+    <div class="spec"><dt>Cost / hour</dt><dd>18.36<span>USD</span></dd></div>
+    <div class="spec"><dt>Cold start</dt><dd>~25<span>min</span></dd></div>
+  </dl>
+</header>
+
+<div class="layout">
+
+  <aside class="rail">
+    <nav aria-label="Sections">
+      <a href="#what"><span class="rail-num">01</span>What you're deploying</a>
+      <a href="#hardware"><span class="rail-num">02</span>Choosing hardware</a>
+      <a href="#before"><span class="rail-num">03</span>Before you start</a>
+      <a href="#deploy"><span class="rail-num">04</span>Deploy the base model</a>
+      <a href="#verify"><span class="rail-num">05</span>Verify it works</a>
+      <a href="#uncensored"><span class="rail-num">06</span>The uncensored variant</a>
+      <a href="#opencode"><span class="rail-num">07</span>Connect OpenCode</a>
+      <a href="#bugs"><span class="rail-num">08</span>Bugs and gotchas</a>
+      <a href="#context"><span class="rail-num">09</span>Raising the context limit</a>
+      <a href="#cli"><span class="rail-num">10</span>Doing it from the CLI</a>
+      <a href="#cost"><span class="rail-num">11</span>Cost and teardown</a>
+    </nav>
+  </aside>
+
+  <main>
+
+  <!-- 01 -->
+  <section id="what">
+    <div class="sec-head"><span class="sec-num">01</span><h2>What you're deploying</h2></div>
+    <div class="prose">
+      <p><strong>GLM-5.3-Flash</strong> is a hybrid mixture-of-experts model released 2026-08-26. It is not a conventional dense transformer, and three of its architectural quirks directly cause problems later in this guide — so they're worth knowing before you spend money.</p>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:20px">
+      <table>
+        <thead><tr><th>Property</th><th>Value</th><th>Why it matters here</th></tr></thead>
+        <tbody>
+          <tr><td>Total parameters</td><td class="num">321,323,031,390</td><td>Identical in base and abliterated builds — shapes are interchangeable</td></tr>
+          <tr><td>Precision</td><td class="mono">FP8 e4m3 + BF16</td><td>314.4B FP8, 6.9B BF16 (vision tower, embeddings, norms)</td></tr>
+          <tr><td>Weights on disk</td><td class="num">306 GiB</td><td>62 safetensors shards; the single biggest constraint</td></tr>
+          <tr><td>Layers</td><td class="num">45</td><td>34 KDA linear-attention + 11 sparse MLA, interleaved</td></tr>
+          <tr><td>Experts</td><td class="num">288 routed + 1 shared</td><td>8 active per token</td></tr>
+          <tr><td>Attention heads</td><td class="num">64</td><td><strong>Tensor-parallel size must divide 64</strong> — so 3, 5, 6, 7 GPUs are invalid</td></tr>
+          <tr><td>Attention type</td><td class="mono">NoPE MLA</td><td><code>qk_rope_head_dim: 0</code>, <code>kv_lora_rank: 512</code> — needs FlashInfer ≥ 0.6.17</td></tr>
+          <tr><td>Max context</td><td class="num">1,048,576</td><td>Theoretical; this guide uses 65,536 for a sane first boot</td></tr>
+          <tr><td>Modality</td><td>Text + vision</td><td>GLM-4.1V tower included in the checkpoint</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose" style="margin-top:22px">
+      <h3>The two builds</h3>
+      <ul>
+        <li><code>zai-org/GLM-5.3-Flash</code> — the official base model. MIT licensed, not gated, no HF token needed.</li>
+        <li><code>dealignai/GLM-5.3-Flash-UNCENSORED-FP8</code> — an abliterated derivative with safety refusals removed. Same architecture, same parameter count, same 306 GiB.</li>
+      </ul>
+      <p>Both are served by the identical procedure. Only the download URL and the <code>--model</code> path differ.</p>
+    </div>
+
+    <div class="note good" style="margin-top:20px">
+      <span class="nlab">Deploy the base first</span>
+      <p>The abliterated build is a community derivative with no usage history. If you start there and it fails, you cannot tell whether the checkpoint or the (pre-release) inference engine is at fault. Standing up the base first costs one extra download and makes every later failure diagnosable. Both bugs in section 08 turned out to be engine bugs, not checkpoint bugs.</p>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section id="hardware">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Choosing hardware</h2></div>
+    <div class="prose">
+      <p>306 GiB of weights must fit in aggregate VRAM, with headroom for KV cache, Mamba state blocks and activations. Budget roughly <strong>340–360 GiB</strong> total.</p>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:20px">
+      <table>
+        <thead><tr><th>Configuration</th><th>Usable VRAM</th><th class="mono">TP</th><th>$/hr</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>4 × H200 141GB</td><td class="num">525 GiB</td><td class="mono">4</td><td class="num">18.36</td><td><span class="pill ok">Recommended</span></td></tr>
+          <tr><td>8 × H100 80GB</td><td class="num">596 GiB</td><td class="mono">8</td><td class="num">26.32</td><td><span class="pill ok">Works</span></td></tr>
+          <tr><td>4 × B200 180GB</td><td class="num">670 GiB</td><td class="mono">4</td><td class="num">27.16</td><td><span class="pill ok">Fastest</span></td></tr>
+          <tr><td>8 × H200 141GB</td><td class="num">1050 GiB</td><td class="mono">8</td><td class="num">36.72</td><td><span class="pill warn">Overkill</span></td></tr>
+          <tr><td>2 × H200</td><td class="num">262 GiB</td><td class="mono">2</td><td class="num">9.18</td><td><span class="pill no">Too small</span></td></tr>
+          <tr><td>3 × H200</td><td class="num">393 GiB</td><td class="mono">—</td><td class="num">13.77</td><td><span class="pill no">64 ÷ 3 invalid</span></td></tr>
+          <tr><td>4 × H100 80GB</td><td class="num">298 GiB</td><td class="mono">4</td><td class="num">13.16</td><td><span class="pill no">Too small</span></td></tr>
+          <tr><td>Any A100</td><td class="num">—</td><td class="mono">—</td><td class="num">—</td><td><span class="pill no">No FP8</span></td></tr>
+          <tr><td>AMD MI300X</td><td class="num">—</td><td class="mono">—</td><td class="num">—</td><td><span class="pill no">Needs gfx950</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose" style="margin-top:22px">
+      <h3>Hopper versus Blackwell</h3>
+      <p>On <strong>Blackwell</strong> (B200) you may add <code>--kv-cache-dtype fp8</code>. On <strong>Hopper</strong> (H100/H200) that flag is unsupported for this model and will fail — leave it off and run BF16 KV. The model card's suggested launch command assumes a GB200 and will not work as written on Hopper.</p>
+      <h3>Prefer four large GPUs over eight small ones</h3>
+      <p>A free 8-GPU node is materially harder to schedule than a free 4-GPU node. During testing, 8-GPU requests failed every attempt across two datacenters while 4-GPU requests succeeded.</p>
+    </div>
+
+    <div class="note care" style="margin-top:20px">
+      <span class="nlab">The datacenter trap</span>
+      <p>Your GPU and your storage must be in the <strong>same datacenter</strong>, and not every datacenter offers both. During testing, the only region with free 4 × H200 capacity (<code>US-GA-2</code>) did not support network volumes at all, and the region with volumes (<code>EU-FR-1</code>) intermittently had no GPUs. Check both before committing — see <a href="#bug-06">BUG-06</a>.</p>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section id="before">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Before you start</h2></div>
+    <div class="prose">
+      <ul>
+        <li>A <strong>RunPod account with credit</strong>. Budget $15–25 for a first deployment including mistakes.</li>
+        <li>A <strong>secret you invent now</strong> to protect the endpoint. Any random string, e.g. <code>glm-</code> followed by 32 random characters. Write it down; you'll need it three times.</li>
+        <li>No Hugging Face token is required — both repositories are public and ungated.</li>
+        <li>Roughly <strong>45 minutes</strong>, most of it waiting.</li>
+      </ul>
+    </div>
+
+    <div class="note stop" style="margin-top:20px">
+      <span class="nlab">Read this before clicking Deploy</span>
+      <p>A GPU pod bills from the moment it starts, whether or not the model is loaded, and whether or not it is crash-looping. At $18.36/hr an overnight mistake costs about $440. Set a billing alert, and jump to section 09 before you walk away.</p>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section id="deploy">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Deploy the base model</h2></div>
+    <div class="prose" style="margin-bottom:24px">
+      <p>The strategy is <strong>one pod, two images</strong>. You start the pod on a general-purpose PyTorch image that gives you a shell, download the weights to persistent storage, then edit the same pod to run vLLM. Doing it this way holds your scarce multi-GPU allocation for the whole process instead of releasing it and re-competing for capacity.</p>
+    </div>
+
+    <div class="note care" style="margin-bottom:24px">
+      <span class="nlab">Console or CLI</span>
+      <p>The steps below use the web console. <strong>Section 10 gives the REST equivalent of every one of them</strong> — and those API calls are the ones that were actually executed to produce this deployment, whereas these console click-paths are transcribed from RunPod's published UI. If a label here does not match what you see, trust section 10.</p>
+    </div>
+
+    <div class="steps">
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">01</span><h3>Create storage</h3></div>
+        <div class="step-body">
+          <p>In the RunPod console go to <strong>Storage → Network Volumes → New Network Volume</strong>.</p>
+          <ul>
+            <li><strong>Size:</strong> 400 GB for one model, 750 GB to hold base and abliterated side by side</li>
+            <li><strong>Datacenter:</strong> one that offers <em>both</em> network volumes and your chosen GPU</li>
+          </ul>
+          <p>If the console refuses your GPU's region, that region has no volume support. Use a pod-local <strong>persistent disk</strong> instead — set it when creating the pod, mounted at <code>/workspace</code>. It survives image swaps and restarts but is deleted with the pod.</p>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">02</span><h3>Deploy the pod on a shell image</h3></div>
+        <div class="step-body">
+          <p><strong>Pods → Deploy</strong>. Attach the volume from step 01 <em>first</em> — that filters the GPU list to valid regions.</p>
+          <div class="tbl-wrap">
+            <table>
+              <tbody>
+                <tr><td style="width:190px">GPU</td><td class="mono">H200 SXM × 4</td></tr>
+                <tr><td>Template / image</td><td class="mono">runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404</td></tr>
+                <tr><td>Container disk</td><td class="mono">60 GB</td></tr>
+                <tr><td>Volume mount path</td><td class="mono">/workspace</td></tr>
+                <tr><td>Exposed HTTP ports</td><td class="mono">8000</td></tr>
+                <tr><td>Environment</td><td class="mono">HF_XET_HIGH_PERFORMANCE=1</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Expose port <strong>8000</strong> now even though nothing listens on it yet. Adding a port later forces a restart.</p>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">03</span><h3>Open a terminal on the pod</h3></div>
+        <div class="step-body">
+          <p>Wait for status <strong>Running</strong>, then <strong>Connect → Start Web Terminal → Open Web Terminal</strong>. This needs no SSH key and is the simplest route.</p>
+          <p>For SSH instead, add your public key at <strong>Settings → SSH Keys</strong> <em>before</em> creating the pod, then use the direct command shown under Connect. See <a href="#bug-08">BUG-08</a> — the two SSH methods are not interchangeable.</p>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">04</span><h3>Download the weights</h3></div>
+        <div class="step-body">
+          <p>In that terminal:</p>
+          <div class="code">
+            <div class="code-lab">web terminal · pod</div>
+<pre><span class="c"># --break-system-packages is required; see BUG-07</span>
+pip install --break-system-packages -U <span class="s">"huggingface_hub[cli,hf_xet]"</span>
+
+mkdir -p /workspace/models
+
+hf download zai-org/GLM-5.3-Flash \
+  --local-dir /workspace/models/GLM-5.3-Flash</pre>
+          </div>
+          <p>Expect <strong>306 GiB across 62 shards in roughly 7 minutes</strong> at ~750 MB/s. If your terminal disconnects, re-run the same command — it resumes.</p>
+          <p>Confirm before moving on:</p>
+          <div class="code">
+            <div class="code-lab">verify download</div>
+<pre>ls /workspace/models/GLM-5.3-Flash/*.safetensors | wc -l   <span class="c"># 62</span>
+du -sh /workspace/models/GLM-5.3-Flash                     <span class="c"># 306G</span>
+ls /workspace/models/GLM-5.3-Flash/processor_config.json   <span class="c"># must exist</span></pre>
+          </div>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">05</span><h3>Swap the pod to vLLM</h3></div>
+        <div class="step-body">
+          <p>Back in the console, open the pod's <strong>⋯ menu → Edit Pod</strong>. Change the image and set the start command. The pod keeps its ID, its volume and its GPUs.</p>
+          <div class="code">
+            <div class="code-lab">container image</div>
+<pre>vllm/vllm-openai:glm53-flash-x86_64-cu130</pre>
+          </div>
+          <p style="margin-top:4px">Use the <code>cu129</code> tag instead if your host reports CUDA 12.8 rather than 13.0 — the console shows this on the pod.</p>
+          <div class="code">
+            <div class="code-lab">container start command · replace YOUR_SECRET_KEY</div>
+<pre>--model /workspace/models/GLM-5.3-Flash \
+--served-model-name glm53 \
+--tensor-parallel-size 4 \
+--max-model-len 65536 \
+--max-num-seqs 256 \
+--gpu-memory-utilization 0.92 \
+--api-key YOUR_SECRET_KEY \
+--enable-auto-tool-choice \
+--tool-call-parser glm47 \
+--reasoning-parser glm45 \
+--host 0.0.0.0 \
+--port 8000</pre>
+          </div>
+          <p>Every flag earns its place:</p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Flag</th><th>Why</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">--model /workspace/…</td><td>A <strong>local path, never a repo ID</strong> — see <a href="#bug-01">BUG-01</a></td></tr>
+                <tr><td class="mono">--max-num-seqs 256</td><td>Prevents a Mamba-cache crash — see <a href="#bug-02">BUG-02</a></td></tr>
+                <tr><td class="mono">--api-key</td><td>Without it your endpoint is open to the internet — <a href="#bug-09">BUG-09</a></td></tr>
+                <tr><td class="mono">--tool-call-parser glm47</td><td>Required for function calling in agent tools</td></tr>
+                <tr><td class="mono">--reasoning-parser glm45</td><td>Splits chain-of-thought into a separate field</td></tr>
+                <tr><td class="mono">--max-model-len 65536</td><td>Conservative first boot; raise later once stable</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">06</span><h3>Wait — and know what you're waiting for</h3></div>
+        <div class="step-body">
+          <p>Watch the container log. Startup has three phases and the last one dominates:</p>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Phase</th><th>Duration</th><th>Log signal</th></tr></thead>
+              <tbody>
+                <tr><td>Engine init</td><td class="num">~1 min</td><td class="mono">Resolved architecture: Glm5Next…</td></tr>
+                <tr><td>Weight load</td><td class="num">~40 sec</td><td class="mono">Model loading took 75.65 GiB</td></tr>
+                <tr><td>Kernel JIT + CUDA graph capture</td><td class="num">13–18 min</td><td class="mono">[Autotuner]: Autotuning process…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><strong>Distinguishing "loading" from "crash-looping" matters.</strong> Both show repeated shard-loading progress. The reliable tell is the worker PID in log lines like <code>(Worker_TP0 pid=1048)</code>. A stable PID over several minutes means it is loading. A PID that changes every few minutes means it is crashing and restarting — stop waiting and read section 08.</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section id="verify">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Verify it works</h2></div>
+    <div class="prose" style="margin-bottom:18px">
+      <p>Your endpoint is <code>https://&lt;POD_ID&gt;-8000.proxy.runpod.net/v1</code>, with the pod ID from the console. Run all three checks — the third is the one people skip.</p>
+    </div>
+
+    <div class="code">
+      <div class="code-lab">local machine</div>
+<pre>POD=<span class="s">"your-pod-id"</span>
+KEY=<span class="s">"YOUR_SECRET_KEY"</span>
+BASE=<span class="s">"https://$POD-8000.proxy.runpod.net/v1"</span>
+
+<span class="c"># 1 — is it serving?</span>
+curl <span class="s">"$BASE/models"</span> -H <span class="s">"Authorization: Bearer $KEY"</span>
+
+<span class="c"># 2 — does it generate?</span>
+curl <span class="s">"$BASE/chat/completions"</span> -H <span class="s">"Authorization: Bearer $KEY"</span> \
+  -H <span class="s">'Content-Type: application/json'</span> \
+  -d <span class="s">'{"model":"glm53","messages":[{"role":"user","content":"Reply with exactly: it works"}],"max_tokens":64}'</span>
+
+<span class="c"># 3 — is a WRONG key rejected? Must print 401.</span>
+curl -o /dev/null -w <span class="s">'%{http_code}\n'</span> <span class="s">"$BASE/models"</span> -H <span class="s">"Authorization: Bearer wrong"</span></pre>
+    </div>
+
+    <div class="prose" style="margin-top:22px">
+      <h3>Reading the results</h3>
+      <ul>
+        <li><span class="pill ok">200</span> plus a model named <code>glm53</code> — serving correctly.</li>
+        <li><span class="pill warn">502</span> — the proxy is up but vLLM is not listening. Still starting, or crash-looping.</li>
+        <li><span class="pill warn">404</span> — the container is mid-restart.</li>
+        <li><span class="pill no">Anything but 401 on check 3</span> — your endpoint is unauthenticated and publicly reachable. Fix before continuing.</li>
+      </ul>
+      <p>A correct response also carries a populated <code>reasoning</code> field separate from <code>content</code>, confirming the reasoning parser is active.</p>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section id="uncensored">
+    <div class="sec-head"><span class="sec-num">06</span><h2>The uncensored variant</h2></div>
+    <div class="prose">
+      <p>Identical procedure, two changed strings. If the base is already running you do not need a new pod.</p>
+    </div>
+
+    <div class="note care" style="margin-top:18px;margin-bottom:22px">
+      <span class="nlab">Check your free space first</span>
+      <p>Each build is 306 GiB. Both fit only on a volume of ~700 GB or more. On a 400–420 GB disk you must delete the base first — and re-downloading it later is another 7 minutes.</p>
+    </div>
+
+    <div class="steps">
+      <article class="step">
+        <div class="step-head"><span class="step-n">01</span><h3>Return the pod to the shell image</h3></div>
+        <div class="step-body">
+          <p><strong>Edit Pod</strong> → set the image back to <code>runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404</code> and clear the start command. The vLLM image has no shell server, so you cannot get a terminal while it is running (<a href="#bug-08">BUG-08</a>).</p>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">02</span><h3>Download the abliterated weights</h3></div>
+        <div class="step-body">
+          <div class="code">
+            <div class="code-lab">web terminal · pod</div>
+<pre><span class="c"># only if you need the space:</span>
+<span class="c"># rm -rf /workspace/models/GLM-5.3-Flash</span>
+
+pip install --break-system-packages -U <span class="s">"huggingface_hub[cli,hf_xet]"</span>
+
+hf download dealignai/GLM-5.3-Flash-UNCENSORED-FP8 \
+  --local-dir /workspace/models/GLM-5.3-UNCENSORED</pre>
+          </div>
+        </div>
+      </article>
+
+      <article class="step">
+        <div class="step-head"><span class="step-n">03</span><h3>Swap back to vLLM with the new path</h3></div>
+        <div class="step-body">
+          <p>Same image and same flags as step 05 earlier, with two lines changed:</p>
+          <div class="code">
+            <div class="code-lab">changed lines only</div>
+<pre>--model /workspace/models/GLM-5.3-UNCENSORED \
+--served-model-name glm53-uncensored \</pre>
+          </div>
+          <p>Giving it a distinct served name keeps the two builds unambiguous in any client. Verify with section 05, substituting <code>glm53-uncensored</code> as the model.</p>
+        </div>
+      </article>
+    </div>
+
+    <div class="note good" style="margin-top:22px">
+      <span class="nlab">Result</span>
+      <p>The abliterated build loaded and served on the first attempt — 75.65 GiB per worker, matching the base exactly — and passed chat, tool-calling and auth checks identically. Despite having no prior downloads on Hugging Face, it presented no checkpoint-specific problems.</p>
+    </div>
+  </section>
+
+  <!-- 07 -->
+  <section id="opencode">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Connect OpenCode</h2></div>
+    <div class="prose">
+      <p>vLLM speaks the OpenAI API, so any OpenAI-compatible client works. OpenCode needs <strong>two files that reference each other by a shared ID</strong> — understanding that is the difference between this taking two minutes and taking an hour.</p>
+      <h3>How the two files connect</h3>
+      <p>Built-in providers ship with their URLs known. Yours does not exist in any registry, so <em>you</em> supply the address. The provider ID is only a lookup key joining a credential to a connection:</p>
+    </div>
+
+    <div class="code" style="margin-top:16px">
+      <div class="code-lab">the join</div>
+<pre>          provider id: <span class="k">"runpod-glm"</span>
+                 │
+       ┌─────────┴─────────┐
+       ▼                   ▼
+   auth.json          opencode.jsonc
+   your API key       baseURL + models
+   (you type it)      (you write it)</pre>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Step 1 — write the config</h3>
+      <p>Create <code>opencode.jsonc</code> in your global OpenCode config directory (<code>~/.config/opencode/</code> on macOS, Linux and Windows alike). Use the global path rather than a project folder so it works from any directory.</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">~/.config/opencode/opencode.jsonc</div>
+<pre>{
+  <span class="k">"$schema"</span>: <span class="s">"https://opencode.ai/config.json"</span>,
+  <span class="k">"provider"</span>: {
+    <span class="k">"runpod-glm"</span>: {
+      <span class="k">"npm"</span>: <span class="s">"@ai-sdk/openai-compatible"</span>,
+      <span class="k">"name"</span>: <span class="s">"GLM-5.3-Flash (RunPod)"</span>,
+      <span class="k">"options"</span>: {
+        <span class="k">"baseURL"</span>: <span class="s">"https://YOUR_POD_ID-8000.proxy.runpod.net/v1"</span>
+      },
+      <span class="k">"models"</span>: {
+        <span class="k">"glm53"</span>: {
+          <span class="k">"name"</span>: <span class="s">"GLM-5.3-Flash"</span>,
+          <span class="k">"limit"</span>: { <span class="k">"context"</span>: 65536, <span class="k">"output"</span>: 16384 },
+          <span class="k">"tool_call"</span>: true
+        },
+        <span class="k">"glm53-uncensored"</span>: {
+          <span class="k">"name"</span>: <span class="s">"GLM-5.3-Flash UNCENSORED"</span>,
+          <span class="k">"limit"</span>: { <span class="k">"context"</span>: 65536, <span class="k">"output"</span>: 16384 },
+          <span class="k">"tool_call"</span>: true
+        }
+      }
+    }
+  }
+}</pre>
+    </div>
+
+    <div class="prose" style="margin-top:22px">
+      <h3>Step 2 — register the credential</h3>
+      <p>Launch <code>opencode</code>, run <code>/connect</code>, choose <strong>Other</strong>, and enter:</p>
+      <ul>
+        <li><strong>Provider ID:</strong> <code>runpod-glm</code> — must match the config <em>exactly</em></li>
+        <li><strong>API key:</strong> the secret from your start command</li>
+      </ul>
+      <p>This writes <code>~/.local/share/opencode/auth.json</code>. Note the different tree: config lives under <code>.config</code>, credentials under <code>.local/share</code>.</p>
+
+      <h3>Step 3 — restart, then select</h3>
+      <p>Quit OpenCode <strong>completely</strong> and relaunch. It does not reload config live. Then <code>/models</code> and pick your provider.</p>
+    </div>
+
+    <div class="note care" style="margin-top:22px">
+      <span class="nlab">Three things that will bite you</span>
+      <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
+        <li><strong>The models list is not validated.</strong> It's a menu. One vLLM process serves one checkpoint, so an entry whose name isn't in your start command returns 404 — the config will offer it anyway.</li>
+        <li><strong>A project-level <code>opencode.json</code> overrides the global one.</strong> Stray copies cause auth that works in one directory and fails in another.</li>
+        <li><strong>The base URL contains the pod ID.</strong> Editing a pod keeps it; terminating and recreating does not. Rebuild the pod and you must update this file.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section id="bugs">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Bugs and gotchas</h2></div>
+    <div class="prose" style="margin-bottom:24px">
+      <p>Encountered during a real deployment on 2026-08-27. The first two <strong>will</strong> hit you — they are unavoidable with this model on this engine, and the launch command on the model card triggers both.</p>
+    </div>
+
+    <div class="bugs">
+
+      <article class="bug" id="bug-01">
+        <div class="bug-top"><span class="bug-id">BUG-01</span><h3>A Hugging Face repo ID crashes on startup</h3><span class="pill no">Blocking</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>FileNotFoundError: 'zai-org/GLM-5.3-Flash/processor_config.json'</code> seconds after launch, before any weights load.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v"><code>Glm5NextProcessor.from_pretrained</code> calls <code>open()</code> on the model string as though it were a directory, instead of resolving it through the Hub. The file exists in the repo; it is simply never downloaded. <strong>Any</strong> repo ID fails.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Download the weights yourself and pass a local directory to <code>--model</code>. This is the entire reason the guide splits download and serve into two images.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-02">
+        <div class="bug-top"><span class="bug-id">BUG-02</span><h3>Crash-loop during CUDA graph capture</h3><span class="pill no">Blocking</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>ValueError: max_num_seqs (1024) exceeds available Mamba cache blocks (512)</code>. Weights load fully, then it dies and restarts — roughly every three minutes, indefinitely.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">34 of 45 layers are KDA linear-attention, and every concurrent sequence needs its own state block. vLLM's default of 1024 sequences demands more blocks than the memory left after 306 GiB of weights can supply.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Add <code>--max-num-seqs 256</code>. Also raise <code>--gpu-memory-utilization</code> to <code>0.92</code> for headroom. Values above 512 sit on the boundary and are fragile.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-03">
+        <div class="bug-top"><span class="bug-id">BUG-03</span><h3>The architecture is not in any vLLM release</h3><span class="pill warn">Plan around</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v">Stock vLLM images do not recognise <code>glm5_next</code>.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">Support is an unmerged pull request (vllm#53906). Only per-model preview images carry it.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Use <code>vllm/vllm-openai:glm53-flash-x86_64-cu130</code> (or <code>-cu129</code>). Match the tag to your host CUDA version — a cu130 image needs a CUDA 13 driver.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-04">
+        <div class="bug-top"><span class="bug-id">BUG-04</span><h3>Loading and crash-looping look identical</h3><span class="pill warn">Wastes hours</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v">Shard-loading progress bars advance repeatedly and the endpoint stays on 502. It reads like slow progress.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">Each crash restarts the whole load, reprinting the same progress from zero.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Compare worker PIDs across several minutes: <code>(Worker_TP0 pid=1048)</code>. Stable PID means loading; changing PID means crashing. Total healthy startup is ~20 minutes — past 25, assume a crash and grep the log for <code>Error</code> or <code>Traceback</code>.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-05">
+        <div class="bug-top"><span class="bug-id">BUG-05</span><h3>The model card's launch command does not work</h3><span class="pill warn">Misleading</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v">Copying the published command produces out-of-memory or unsupported-flag errors.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">It assumes a GB200. <code>--tensor-parallel-size 4</code> needs 76.5 GiB per GPU, which OOMs on any 80 GB card, and <code>--kv-cache-dtype fp8</code> is Blackwell-only for this model.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Use the command in section 04. TP4 requires ≥141 GB GPUs; on 80 GB cards use eight of them with TP8.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-06">
+        <div class="bug-top"><span class="bug-id">BUG-06</span><h3>Storage and GPUs live in different datacenters</h3><span class="pill warn">Plan around</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v">"There are no longer any instances available with the requested specifications", repeatedly, for a GPU the catalogue lists as available.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">A network volume pins the pod to its datacenter. Availability is per-datacenter, not global. In testing the only region with free 4 × H200 offered no network volumes at all, and standard-tier storage was unavailable in the region that did.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Confirm both before creating the volume — volumes cannot move, and a fresh 306 GiB download is only ~7 minutes. Where regions do not overlap, use a pod-local persistent disk and accept losing it on teardown.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-07">
+        <div class="bug-top"><span class="bug-id">BUG-07</span><h3>pip refuses to install</h3><span class="pill ok">Trivial</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>error: externally-managed-environment</code></div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">PEP 668 protects the system Python in the base image.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Add <code>--break-system-packages</code>. Safe in a disposable container.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-08">
+        <div class="bug-top"><span class="bug-id">BUG-08</span><h3>SSH works, then stops working</h3><span class="pill warn">Confusing</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>Permission denied (publickey)</code> on the proxy address, or SSH vanishing entirely after switching to the vLLM image.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">Two unrelated mechanisms. Proxy SSH (<code>ssh.runpod.io</code>) authenticates against <em>account-level</em> keys in Settings. Direct SSH uses the pod's <code>PUBLIC_KEY</code> variable — and only works on images that run a shell server. The vLLM image runs <code>vllm serve</code> as its entrypoint and has none.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Add your key at <strong>Settings → SSH Keys</strong> for the proxy method. Do all shell work while on the PyTorch image, or just use the web terminal.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-09">
+        <div class="bug-top"><span class="bug-id">BUG-09</span><h3>The endpoint is public, and the key is logged</h3><span class="pill no">Security</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v">Anyone with the URL can use your GPUs. Separately, your key appears in plaintext in the container log.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">The RunPod proxy URL is publicly routable and vLLM has no authentication by default. vLLM also prints its full argument list, including <code>--api-key</code>, at startup.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Always set <code>--api-key</code>, and verify a wrong key returns 401. Treat the key as visible to anyone who can read your pod logs, and rotate it if those are shared.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-10">
+        <div class="bug-top"><span class="bug-id">BUG-10</span><h3>Prefill is slower than advertised</h3><span class="pill ok">Cosmetic</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>WARNING: No MLA prefill backend supports this model; sparse MLA will use the top-k MQA path only</code></div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">No optimised dense-MHA prefill backend exists yet for this attention layout.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">None needed — it serves correctly. Expect prefill throughput below the model card's figures until the architecture merges upstream.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-11">
+        <div class="bug-top"><span class="bug-id">BUG-11</span><h3>A deprecated download variable does nothing</h3><span class="pill ok">Trivial</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>FutureWarning: HF_HUB_ENABLE_HF_TRANSFER is deprecated</code></div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">Superseded by Xet-based transfer.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Use <code>HF_XET_HIGH_PERFORMANCE=1</code>. Harmless either way — downloads still reached ~750 MB/s.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-13">
+        <div class="bug-top"><span class="bug-id">BUG-13</span><h3>Pod creation on REST v2 is broken upstream</h3><span class="pill no">Blocking</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v"><code>Field "objectMounts" is not defined by type "PodFindAndDeployOnDemandInput"</code> on every <code>POST /v2/pods</code>. Observed 2026-08-28; the identical payload worked on 2026-08-27.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">RunPod's REST layer injects <code>objectMounts: null</code> into a GraphQL mutation whose schema rejects it. Both halves are RunPod's own. The field appears <strong>nowhere in their published v2 OpenAPI spec</strong> — an unreleased feature shipped ahead of the schema supporting it. <code>GET /v2/gputypes</code> returning 404 is the same churn.</div>
+          <div class="bug-k">Not you</div>
+          <div class="bug-v">It fails on a minimal <code>{name, image, gpu}</code> body, for every GPU type, every datacenter, via raw curl and via RunPod's own MCP client. Do not debug your payload — nothing in it is the cause.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">Create pods through <strong>GraphQL</strong> instead — the same operation without the broken translation layer (see section 10). Read, PATCH and DELETE on REST v2 are unaffected, so use REST for everything else. Retest REST periodically and prefer it once fixed.</div>
+        </div>
+      </article>
+
+      <article class="bug" id="bug-12">
+        <div class="bug-top"><span class="bug-id">BUG-12</span><h3>Restarting is 25× slower than the first start</h3><span class="pill warn">Budget for it</span></div>
+        <div class="bug-grid">
+          <div class="bug-k">Symptom</div>
+          <div class="bug-v">The first launch loads all 62 shards in ~37 seconds. A later restart of the same pod, same weights, takes <strong>13.5 minutes</strong> — about 13 s/shard instead of 0.5 s/shard.</div>
+          <div class="bug-k">Cause</div>
+          <div class="bug-v">The first load reads from the host page cache, because the files were written moments earlier by the download. Any later start is a cold read of 306 GiB from network-backed storage. Same data, different path.</div>
+          <div class="bug-k">Fix</div>
+          <div class="bug-v">None — it is the honest cost of a restart. Plan for <strong>~25 minutes and ~$7</strong> per restart on 4 × H200, not the 20 minutes the first boot suggests. Change several flags at once rather than iterating one at a time. The kernel-JIT cache does not help either: it lives on the container disk, which is wiped on every restart.</div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- 09 -->
+  <section id="context">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Raising the context limit</h2></div>
+    <div class="prose">
+      <p>The guide starts you at <strong>65,536 tokens</strong> because a conservative first boot is easier to debug. The model itself declares <strong>1,048,576</strong> — and on 4 × H200 you can actually reach it. This model is unusually cheap on KV cache, so context is rarely the binding constraint.</p>
+
+      <h3>Why it's so cheap</h3>
+      <p>Two architectural properties cut KV memory by roughly an order of magnitude versus a conventional dense transformer:</p>
+      <ul>
+        <li><strong>Only 11 of 45 layers cache anything.</strong> The other 34 are KDA linear-attention with fixed-size state per sequence — their cost does not grow with context.</li>
+        <li><strong>NoPE MLA compresses KV to a 512-dimension latent.</strong> With <code>qk_rope_head_dim: 0</code> there is no separate rotary cache to store.</li>
+      </ul>
+    </div>
+
+    <div class="code" style="margin-top:18px">
+      <div class="code-lab">per-token KV cost</div>
+<pre>11 layers × 512 latent dims × 2 bytes (BF16)  =  11,264 bytes
+                                              ≈  <span class="k">11 KiB per token</span></pre>
+    </div>
+
+    <div class="prose" style="margin-top:22px">
+      <h3>What that buys you</h3>
+      <p>On 4 × H200 at <code>--gpu-memory-utilization 0.92</code>: 483 GiB usable, minus 306 GiB of weights and ~25 GiB of activations and CUDA graphs, leaves roughly <strong>152 GiB of KV pool ≈ 14.5M tokens</strong>.</p>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:18px">
+      <table>
+        <thead><tr><th>max-model-len</th><th>KV per sequence</th><th>Concurrent full-length sequences</th></tr></thead>
+        <tbody>
+          <tr><td class="num">65,536</td><td class="num">0.69 GiB</td><td class="num">~221</td></tr>
+          <tr><td class="num">131,072</td><td class="num">1.38 GiB</td><td class="num">~111</td></tr>
+          <tr><td class="num">262,144</td><td class="num">2.75 GiB</td><td class="num">~55</td></tr>
+          <tr><td class="num">524,288</td><td class="num">5.50 GiB</td><td class="num">~28</td></tr>
+          <tr><td class="num">1,048,576</td><td class="num">11.00 GiB</td><td class="num">~14</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note good" style="margin-top:18px">
+      <span class="nlab">Corroboration</span>
+      <p>This calculation gives a 14.5M-token pool. The published vLLM recipe independently reports a <strong>14.92M-token KV pool at TP4</strong> for this model — close enough to trust the arithmetic. A running server at 65K context with three concurrent requests showed KV usage of 0.3–1.9%, consistent with a pool this large.</p>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>How to change it</h3>
+      <p>Edit one flag and restart. There is no way to change context on a live server — the KV pool is allocated at startup.</p>
+      <ol>
+        <li><strong>Pods → ⋯ → Edit Pod</strong></li>
+        <li>Change <code>--max-model-len</code> in the start command</li>
+        <li>Save. The container restarts and reloads the model.</li>
+      </ol>
+      <p>Budget <strong>~25 minutes and roughly $7</strong> per attempt on 4 × H200. Weights are already on disk, so this is a reload rather than a re-download — but see <a href="#bug-12">BUG-12</a>: a reload is far slower than the first load, and most of that 25 minutes is unavoidable. <strong>Batch your flag changes</strong> rather than testing one at a time.</p>
+    </div>
+
+    <div class="code" style="margin-top:16px">
+      <div class="code-lab">maximum context on 4 × H200</div>
+<pre>--max-model-len 1048576 \
+--max-num-seqs 256 \
+--gpu-memory-utilization 0.92</pre>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>If it refuses to start</h3>
+      <p>vLLM fails fast when the pool cannot hold one full-length sequence:</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">startup error</div>
+<pre>ValueError: The model's max seq len (1048576) is larger than the maximum
+number of tokens that can be stored in KV cache. Try increasing
+`gpu_memory_utilization` or decreasing `max_model_len`.</pre>
+    </div>
+
+    <div class="prose" style="margin-top:16px">
+      <p>Recent vLLM builds append a usable hint — <em>"the estimated maximum model length is 220480"</em>. Take that number and round down. Otherwise, in order of preference:</p>
+      <ul>
+        <li><strong>Raise <code>--gpu-memory-utilization</code></strong> toward <code>0.95</code>. Above that, CUDA graph capture starts failing.</li>
+        <li><strong>Lower <code>--max-num-seqs</code></strong>. Fewer concurrent sequences frees Mamba state blocks — but keep <a href="#bug-02">BUG-02</a> in mind: too high crashes, and the ceiling moves with available memory.</li>
+        <li><strong>Add GPUs.</strong> Going TP8 roughly doubles the pool.</li>
+        <li><strong>On Blackwell only</strong>, add <code>--kv-cache-dtype fp8</code> to halve KV cost. Unsupported on Hopper for this model.</li>
+      </ul>
+    </div>
+
+    <div class="note care" style="margin-top:22px">
+      <span class="nlab">Memory is not the limit — prefill time is</span>
+      <p>A million-token prompt still has to be processed. With chunked prefill at the default 8,192 tokens per batch that is roughly 128 sequential chunks, and per <a href="#bug-10">BUG-10</a> this model currently runs a top-k MQA prefill path rather than an optimised dense one. Expect a first-token latency measured in minutes at extreme context. Raising <code>--max-num-batched-tokens</code> to 16,384 helps, at the cost of activation memory.</p>
+    </div>
+
+    <div class="prose" style="margin-top:22px">
+      <h3>Tell your client about it</h3>
+      <p>Raising the server limit is only half the job — clients advertise their own. In OpenCode, update the model's <code>limit.context</code> to match, or it will keep truncating at the old value:</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">opencode.jsonc</div>
+<pre><span class="k">"limit"</span>: { <span class="k">"context"</span>: 1048576, <span class="k">"output"</span>: 16384 }</pre>
+    </div>
+
+    <div class="prose" style="margin-top:20px">
+      <h3>A note on quality</h3>
+      <p>A declared window is not a guarantee of comprehension across it. 1,048,576 is what the architecture supports and what the server will accept; how well the model actually reasons over a million tokens is a separate question this guide does not answer. If retrieval accuracy matters, test at your intended length rather than assuming the maximum works well.</p>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section id="cli">
+    <div class="sec-head"><span class="sec-num">10</span><h2>Doing it from the CLI</h2></div>
+    <div class="prose">
+      <p>Every console step above has a REST equivalent. This section is <strong>the more trustworthy of the two</strong>: these are the exact calls used to build the deployment this guide documents, whereas the console instructions were written from RunPod's published UI rather than performed click by click.</p>
+
+      <h3>Setup</h3>
+      <p>Create a key at <strong>console.runpod.io → Settings → API Keys</strong> with <strong>Read/Write</strong> permission. Read-only cannot create pods.</p>
+    </div>
+
+    <div class="code" style="margin-top:16px">
+      <div class="code-lab">environment</div>
+<pre>export RUNPOD_API_KEY=<span class="s">"rpa_..."</span>
+export API=<span class="s">"https://api.runpod.io/v2"</span>
+export AUTH=<span class="s">"Authorization: Bearer $RUNPOD_API_KEY"</span></pre>
+    </div>
+
+    <div class="note care" style="margin-top:16px">
+      <span class="nlab">Use v2, not v1</span>
+      <p><code>https://rest.runpod.io/v1</code> is deprecated and takes a <em>different request schema</em>. Posting a v2 body to it returns <code>Extra input keys provided in request body</code> naming <code>image</code>, <code>gpu</code>, <code>disk</code> and <code>mounts</code> — confusing, because those keys are all valid on v2.</p>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Check capacity before you commit</h3>
+      <p>Availability is per-datacenter and changes by the minute. A GPU listed as available globally may be unobtainable in the region your storage lives in.</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">discover GPU types and datacenters</div>
+<pre>curl -s <span class="s">"$API/gputypes"</span> -H <span class="s">"$AUTH"</span> | python -m json.tool
+curl -s <span class="s">"$API/datacenters"</span> -H <span class="s">"$AUTH"</span> | python -m json.tool</pre>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Create the pod</h3>
+      <p>Write the body to a file — it is long, and you will edit and resend it several times.</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">create-pod.json</div>
+<pre>{
+  <span class="k">"name"</span>: <span class="s">"glm53-flash"</span>,
+  <span class="k">"image"</span>: <span class="s">"runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"</span>,
+  <span class="k">"cloud"</span>: <span class="s">"SECURE"</span>,
+  <span class="k">"dataCenterIds"</span>: [<span class="s">"US-GA-2"</span>],
+  <span class="k">"gpu"</span>: { <span class="k">"id"</span>: <span class="s">"NVIDIA H200"</span>, <span class="k">"count"</span>: 4, <span class="k">"allowedCudaVersions"</span>: [<span class="s">"13.0"</span>] },
+  <span class="k">"disk"</span>: 60,
+  <span class="k">"startSsh"</span>: true,
+  <span class="k">"ports"</span>: [<span class="s">"8000/http"</span>, <span class="s">"22/tcp"</span>],
+  <span class="k">"env"</span>: {
+    <span class="k">"PUBLIC_KEY"</span>: <span class="s">"ssh-ed25519 AAAA... you@host"</span>,
+    <span class="k">"HF_XET_HIGH_PERFORMANCE"</span>: <span class="s">"1"</span>
+  },
+  <span class="k">"mounts"</span>: { <span class="k">"persistent"</span>: { <span class="k">"size"</span>: 420, <span class="k">"path"</span>: <span class="s">"/workspace"</span> } }
+}</pre>
+    </div>
+
+    <div class="code" style="margin-top:12px">
+      <div class="code-lab">send it</div>
+<pre>curl -sS -X POST <span class="s">"$API/pods"</span> -H <span class="s">"$AUTH"</span> \
+  -H <span class="s">'Content-Type: application/json'</span> -d @create-pod.json</pre>
+    </div>
+
+    <div class="note stop" style="margin-top:18px">
+      <span class="nlab">If that returns an objectMounts error — use GraphQL</span>
+      <p>As of 2026-08-28 <code>POST /v2/pods</code> fails upstream (<a href="#bug-13">BUG-13</a>).
+      Do not debug your request; a four-field body fails identically. Create the pod through
+      GraphQL instead — the same operation, one layer below the fault:</p>
+    </div>
+
+    <div class="code" style="margin-top:12px">
+      <div class="code-lab">GraphQL pod creation — the working bypass</div>
+<pre>python -c "
+import json,sys,pathlib,os
+pub=pathlib.Path(os.path.expanduser('~/.ssh/id_ed25519.pub')).read_text().strip()
+q='mutation(\$input: PodFindAndDeployOnDemandInput!) { podFindAndDeployOnDemand(input: \$input) { id machineId } }'
+v={'input':{
+  'cloudType':'SECURE','gpuCount':4,'gpuTypeId':'NVIDIA H200',
+  'containerDiskInGb':60,'volumeInGb':420,'volumeMountPath':'/workspace',
+  'ports':'8000/http,22/tcp','name':'glm53-flash',
+  'imageName':'runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404',
+  'env':[{'key':'PUBLIC_KEY','value':pub},{'key':'HF_XET_HIGH_PERFORMANCE','value':'1'}]
+}}
+json.dump({'query':q,'variables':v}, sys.stdout)
+" | curl -sS -X POST <span class="s">"https://api.runpod.io/graphql"</span> \
+    -H <span class="s">"Authorization: Bearer $RUNPOD_API_KEY"</span> \
+    -H <span class="s">'Content-Type: application/json'</span> -d @-</pre>
+    </div>
+
+    <div class="prose" style="margin-top:16px">
+      <p>Use <strong>GraphQL variables, never string interpolation</strong> — an SSH key containing
+      a backslash (<code>azuread\user</code>) produces <code>Invalid character escape sequence</code>
+      in an inline literal.</p>
+      <p>Field names differ from REST: <code>volumeInGb</code> / <code>volumeMountPath</code> replace
+      <code>mounts.persistent</code>, <code>ports</code> is a comma-separated string,
+      <code>env</code> is a list of <code>{key, value}</code> pairs, and there is no
+      <code>dataCenterIds</code> — GraphQL simply picks a region with capacity.</p>
+      <p>A <code>SUPPLY_CONSTRAINT</code> error here is <em>genuine</em> capacity exhaustion and worth
+      retrying. An <code>objectMounts</code> error is a schema fault and never is. Do not confuse them.</p>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <p>Two mount forms, and the choice is permanent:</p>
+      <ul>
+        <li><code>"mounts": {"persistent": {"size": 420, "path": "/workspace"}}</code> — pod-local disk. Works in <em>any</em> datacenter. Deleted with the pod.</li>
+        <li><code>"mounts": {"network": [{"volumeId": "abc123", "path": "/workspace"}]}</code> — a network volume. Survives the pod, but pins it to that volume's datacenter and only exists in regions that support them.</li>
+      </ul>
+      <p><strong>Mount kind is immutable after creation.</strong> A <code>PATCH</code> adding a network mount to a pod that had none is rejected. Decide before you POST.</p>
+      <p>Expect <code>There are no longer any instances available with the requested specifications</code> when capacity is tight. That is a scheduling failure, not a malformed request — retry, or widen <code>dataCenterIds</code>.</p>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Watch it come up</h3>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">status and SSH endpoint</div>
+<pre>POD=<span class="s">"your-pod-id"</span>
+curl -s <span class="s">"$API/pods/$POD"</span> -H <span class="s">"$AUTH"</span> | python -m json.tool</pre>
+    </div>
+
+    <div class="prose" style="margin-top:16px">
+      <p><code>runtime</code> stays <code>null</code> until the container is live; <code>ssh.direct</code> appears at the same time. Then download the weights over SSH exactly as in section 04:</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">download over ssh</div>
+<pre>ssh root@&lt;HOST&gt; -p &lt;PORT&gt;
+
+pip install --break-system-packages -U <span class="s">"huggingface_hub[cli,hf_xet]"</span>
+mkdir -p /workspace/models
+hf download zai-org/GLM-5.3-Flash --local-dir /workspace/models/GLM-5.3-Flash</pre>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Swap to vLLM without losing the pod</h3>
+      <p>This is the key move. <code>PATCH</code> changes the image and start command in place — the pod keeps its ID, its GPUs, its storage and its URL. You never release the multi-GPU allocation, which matters when capacity is scarce.</p>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">patch image + args</div>
+<pre>curl -sS -X PATCH <span class="s">"$API/pods/$POD"</span> -H <span class="s">"$AUTH"</span> \
+  -H <span class="s">'Content-Type: application/json'</span> -d <span class="s">'{
+  "image": "vllm/vllm-openai:glm53-flash-x86_64-cu130",
+  "args": "--model /workspace/models/GLM-5.3-Flash --served-model-name glm53 --tensor-parallel-size 4 --max-model-len 1048576 --max-num-seqs 256 --gpu-memory-utilization 0.92 --api-key YOUR_SECRET --enable-auto-tool-choice --tool-call-parser glm47 --reasoning-parser glm45 --host 0.0.0.0 --port 8000"
+}'</span></pre>
+    </div>
+
+    <div class="prose" style="margin-top:16px">
+      <p>The same call changes context length later — send only <code>args</code>, leaving <code>image</code> out. Any <code>PATCH</code> to either field restarts the container, so per <a href="#bug-12">BUG-12</a> that is ~25 minutes each time. Batch your changes.</p>
+      <p>Note the direction of travel: to get a shell back you must PATCH the image <em>back</em> to the PyTorch one, because the vLLM image runs no shell server (<a href="#bug-08">BUG-08</a>).</p>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Poll until it serves</h3>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">wait loop</div>
+<pre>BASE=<span class="s">"https://$POD-8000.proxy.runpod.net/v1"</span>
+until curl -sf <span class="s">"$BASE/models"</span> -H <span class="s">"Authorization: Bearer YOUR_SECRET"</span> &gt;/dev/null; do
+  echo <span class="s">"not ready…"</span>; sleep 30
+done
+curl -s <span class="s">"$BASE/models"</span> -H <span class="s">"Authorization: Bearer YOUR_SECRET"</span> | python -m json.tool</pre>
+    </div>
+
+    <div class="prose" style="margin-top:16px">
+      <p>Check <code>max_model_len</code> in that response — it is the only proof the context setting actually took. The pod's <code>args</code> merely show what was <em>requested</em>.</p>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Tear down</h3>
+    </div>
+
+    <div class="code" style="margin-top:14px">
+      <div class="code-lab">delete</div>
+<pre>curl -sS -X DELETE <span class="s">"$API/pods/$POD"</span> -H <span class="s">"$AUTH"</span>
+
+<span class="c"># network volumes are separate and keep billing after the pod is gone</span>
+curl -s <span class="s">"$API/networkvolumes"</span> -H <span class="s">"$AUTH"</span> | python -m json.tool
+curl -sS -X DELETE <span class="s">"$API/networkvolumes/&lt;VOLUME_ID&gt;"</span> -H <span class="s">"$AUTH"</span></pre>
+    </div>
+
+    <div class="prose" style="margin-top:26px">
+      <h3>What was actually verified</h3>
+      <p>Being explicit, so you know which commands are battle-tested and which are transcribed from documentation:</p>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:16px">
+      <table>
+        <thead><tr><th>Operation</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">POST /v2/pods</td><td><span class="pill ok">Executed</span></td></tr>
+          <tr><td class="mono">PATCH /v2/pods/{id} — image + args</td><td><span class="pill ok">Executed</span></td></tr>
+          <tr><td class="mono">GET /v2/pods/{id}</td><td><span class="pill ok">Executed</span></td></tr>
+          <tr><td class="mono">DELETE /v2/pods/{id}</td><td><span class="pill ok">Executed</span></td></tr>
+          <tr><td>SSH + <code>hf download</code></td><td><span class="pill ok">Executed</span></td></tr>
+          <tr><td>Endpoint checks against <code>/v1</code></td><td><span class="pill ok">Executed</span></td></tr>
+          <tr><td class="mono">GET/DELETE /v2/networkvolumes</td><td><span class="pill warn">From docs</span></td></tr>
+          <tr><td>Console click-paths in sections 04 &amp; 06</td><td><span class="pill warn">From docs</span></td></tr>
+          <tr><td class="mono">runpodctl</td><td><span class="pill warn">Not used</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose" style="margin-top:18px">
+      <p>Volumes were created and deleted through a tooling layer over the same API rather than by raw <code>curl</code>, so those two endpoints are correct by documentation but untested here. RunPod also ships an official <code>runpodctl</code> CLI which was not used at all — if you prefer it, treat its syntax as unverified by this guide.</p>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section id="cost">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Cost and teardown</h2></div>
+    <div class="prose">
+      <p>Billing runs from pod start to termination, regardless of whether the model is loaded, idle or crash-looping. All prices are RunPod secure cloud, observed 2026-08-27.</p>
+    </div>
+
+    <div class="tbl-wrap" style="margin-top:20px">
+      <table>
+        <thead><tr><th>Item</th><th>Rate</th><th>Typical</th></tr></thead>
+        <tbody>
+          <tr><td>4 × H200 serving</td><td class="num">$18.36 / hr</td><td class="num">$0.31 / min</td></tr>
+          <tr><td>1 × H200 for downloads only</td><td class="num">$4.59 / hr</td><td class="num">~$0.55 per download</td></tr>
+          <tr><td>Network volume</td><td class="num">~$0.07 / GB / mo</td><td class="num">750 GB ≈ $52 / mo</td></tr>
+          <tr><td>Full first deployment</td><td>—</td><td class="num">$10 – $35</td></tr>
+          <tr><td>Left running 24 h</td><td>—</td><td class="num">$441</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose" style="margin-top:24px">
+      <h3>Reducing the bill</h3>
+      <ul>
+        <li><strong>Download on one GPU, serve on four.</strong> Creating a single-GPU pod for the download costs about $0.55 instead of $2.20 — but you then have to win the multi-GPU allocation again afterwards. When capacity is tight, holding the four-GPU pod through the download is the safer trade.</li>
+        <li><strong>Stop, don't terminate.</strong> A stopped pod keeps its disk and its ID — so your OpenCode base URL stays valid — at a much lower rate.</li>
+        <li><strong>Terminate properly when finished.</strong> Deleting a pod does <em>not</em> delete a network volume; that keeps billing until you delete it under Storage.</li>
+      </ul>
+
+      <h3>Teardown checklist</h3>
+      <ol>
+        <li>Terminate the pod (<strong>Pods → ⋯ → Terminate</strong>).</li>
+        <li>Delete the network volume (<strong>Storage → ⋯ → Delete</strong>) — this is the step most often missed.</li>
+        <li>Confirm zero active resources on the billing page.</li>
+        <li>Optionally remove the <code>runpod-glm</code> entry from <code>auth.json</code>.</li>
+      </ol>
+    </div>
+
+    <div class="note stop" style="margin-top:22px">
+      <span class="nlab">The expensive mistake</span>
+      <p>A pod that crash-loops bills exactly like a healthy one. During testing, a stuck pod ran for fourteen minutes, restarting every three, before the pattern was spotted — about $4.30 for nothing. Check worker PIDs early (<a href="#bug-04">BUG-04</a>) rather than assuming a long startup.</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>Procedure verified end to end on 2026-08-27: 4 × H200 SXM, RunPod secure cloud, vLLM <code>0.1.dev20051+g487ecf187</code>, FlashInfer 0.6.17, CUDA 13.0. Both the base and abliterated builds reached a serving state and passed chat, tool-calling and authentication checks.</p>
+    <p>Version numbers and flags are tied to a pre-release build. Once <code>glm5_next</code> merges into vLLM proper, the preview image will be unnecessary and BUG-01 and BUG-02 may be fixed upstream — check current documentation before assuming these workarounds are still required.</p>
+  </footer>
+
+  </main>
+</div>
+</div>
+
+</body>
+</html>

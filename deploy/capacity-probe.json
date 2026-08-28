@@ -1,0 +1,18 @@
+{
+  "name": "capacity-probe",
+  "image": "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404",
+  "cloud": "SECURE",
+  "dataCenterIds": [
+    "US-GA-2",
+    "US-CA-2",
+    "EUR-IS-4",
+    "AP-JP-1",
+    "US-NC-1",
+    "US-CO-1"
+  ],
+  "gpu": {
+    "id": "NVIDIA H200",
+    "count": 4
+  },
+  "disk": 20
+}

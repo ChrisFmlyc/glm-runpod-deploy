@@ -1,0 +1,9 @@
+{
+  "name": "glm3",
+  "version": "1.0.0",
+  "description": "Lifecycle management for a self-hosted GLM-5.3-Flash endpoint on RunPod.",
+  "author": {
+    "name": "Chris Powell"
+  },
+  "keywords": ["glm", "runpod", "vllm", "inference", "opencode"]
+}

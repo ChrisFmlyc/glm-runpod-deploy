@@ -1,0 +1,22 @@
+{
+  "name": "glm3",
+  "description": "Deploy, pause and tear down GLM-5.3-Flash on RunPod as a private OpenAI-compatible endpoint.",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Chris Powell"
+  },
+  "plugins": [
+    {
+      "name": "glm3",
+      "displayName": "GLM-5.3-Flash on RunPod",
+      "description": "Lifecycle skills for a self-hosted GLM-5.3-Flash vLLM endpoint on RunPod: start (deploy + download + serve), stop (pause with capacity warning), destroy (full teardown).",
+      "source": "./plugins/glm3",
+      "category": "deployment",
+      "skills": [
+        "./skills/start",
+        "./skills/stop",
+        "./skills/destroy"
+      ]
+    }
+  ]
+}

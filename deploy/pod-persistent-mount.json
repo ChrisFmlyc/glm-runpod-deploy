@@ -1,0 +1,32 @@
+{
+  "name": "glm53-flash",
+  "image": "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404",
+  "cloud": "SECURE",
+  "dataCenterIds": [
+    "US-GA-2"
+  ],
+  "gpu": {
+    "id": "NVIDIA H200",
+    "count": 4,
+    "allowedCudaVersions": [
+      "13.0"
+    ]
+  },
+  "disk": 60,
+  "startSsh": true,
+  "ports": [
+    "8000/http",
+    "22/tcp"
+  ],
+  "env": {
+    "PUBLIC_KEY": "ssh-ed25519 AAAA... you@host",
+    "HF_HOME": "/workspace/hf",
+    "HF_XET_HIGH_PERFORMANCE": "1"
+  },
+  "mounts": {
+    "persistent": {
+      "size": 420,
+      "path": "/workspace"
+    }
+  }
+}

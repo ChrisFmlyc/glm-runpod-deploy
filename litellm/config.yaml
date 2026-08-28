@@ -1,0 +1,28 @@
+model_list:
+  # main model - Claude Code primary
+  - model_name: glm53
+    litellm_params:
+      model: openai/glm53-uncensored
+      api_key: os.environ/GLM_API_KEY
+      api_base: os.environ/GLM_BASE_URL
+    model_info:
+      # must match vLLM --max-model-len, else clients truncate early
+      max_input_tokens: 1048576
+      max_output_tokens: 16384
+      max_tokens: 1048576
+
+  # Claude Code also calls a small/fast model for titles and summaries.
+  # Same backend - we only have one model.
+  - model_name: glm53-small
+    litellm_params:
+      model: openai/glm53-uncensored
+      api_key: os.environ/GLM_API_KEY
+      api_base: os.environ/GLM_BASE_URL
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 16384
+      max_tokens: 1048576
+
+litellm_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  drop_params: true

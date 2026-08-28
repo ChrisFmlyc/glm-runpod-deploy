@@ -1,0 +1,30 @@
+{
+  "name": "glm53-downloader",
+  "image": "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404",
+  "cloud": "SECURE",
+  "dataCenterIds": [
+    "EU-FR-1"
+  ],
+  "gpu": {
+    "id": "NVIDIA H200",
+    "count": 1
+  },
+  "disk": 50,
+  "startSsh": true,
+  "ports": [
+    "22/tcp"
+  ],
+  "env": {
+    "PUBLIC_KEY": "ssh-ed25519 AAAA... you@host",
+    "HF_HOME": "/workspace/hf",
+    "HF_XET_HIGH_PERFORMANCE": "1"
+  },
+  "mounts": {
+    "network": [
+      {
+        "volumeId": "hb0s5jftdw",
+        "path": "/workspace"
+      }
+    ]
+  }
+}

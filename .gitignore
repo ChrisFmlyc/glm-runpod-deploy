@@ -1,0 +1,18 @@
+# Secrets — NEVER commit
+.env
+*.key
+*.pem
+
+# Transient session output
+archive/*.log
+*.log
+
+# OS noise
+Thumbs.db
+.DS_Store
+
+# python venv
+.venv-litellm/
+
+# session scratch - not part of the deliverable
+archive/
