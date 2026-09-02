@@ -383,6 +383,36 @@ If it prints a different pod, or `model glm53` (without `-uncensored`), the `.en
 take - fix it before reporting. Requesting a name the pod does not serve returns
 `The model 'glm53' does not exist`; the served name is `glm53-uncensored` only.
 
+### `codex exec` proves connectivity, NOT that prompting is off
+
+The check above is necessary but not sufficient. **Exec has no way to prompt the user, so
+it always reports `approval: never` regardless of configuration** — it passes even when the
+interactive TUI asks for approval before every single command. Do not tell the user
+prompting is fixed on the strength of a `codex-ok`.
+
+Codex runs unattended only when **both** of these are true, and neither works alone:
+
+1. `approval_policy = "never"` **and** `sandbox_mode = "danger-full-access"`. Any sandboxed
+   mode makes Codex build a *managed* permission profile, and the TUI then promotes
+   `never` to `on-request` so it can escalate out of the sandbox.
+2. A `[projects.'<launch dir>'] trust_level = "trusted"` entry. This gate is checked
+   before, and independently of, the approval settings — an untrusted directory prompts on
+   every command whatever `approval_policy` says.
+
+Both live in `glm-codex\.codex-home\config.toml`, which the launcher regenerates on every
+run. It merges existing `[projects.…]` entries so trust is not destroyed; if you ever edit
+that generation, keep the merge.
+
+To actually confirm, read what a real interactive session resolved:
+
+```bash
+grep -o '"approval_policy":"[a-z-]*"' \
+  /c/Users/ChrisPowell/code/glm-codex/.codex-home/sessions/**/rollout-*.jsonl | tail -1
+```
+
+Healthy is `never`. The startup banner is not evidence — it reflects config, and can read
+"YOLO mode" while the session actually runs `on-request`.
+
 ### Two things to tell the user
 
 - **Refusals are a reasoning-mode setting** (Step 0), not the model. The launcher does not

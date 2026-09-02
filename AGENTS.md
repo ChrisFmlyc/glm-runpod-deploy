@@ -45,6 +45,9 @@ Read these before touching anything. Each one cost real time and money to learn.
    restarting may yield a zero-GPU pod. See *Stop vs terminate*.
 6. **Verify from `/v1/models`, never from pod `args`.** The args show what was
    *requested*; only the endpoint proves what vLLM actually allocated.
+7. **The glm-codex launcher needs BOTH no-prompt settings.** `approval_policy = "never"`
+   *and* `sandbox_mode = "danger-full-access"`, *and* a `[projects.<dir>]`
+   `trust_level = "trusted"` entry. Neither works alone. See *The client: glm-codex launcher*.
 
 ---
 
@@ -290,6 +293,53 @@ scoped Codex config on each run, and connects straight to the Responses API (no 
 After every deploy, the only thing to update is that launcher's `.env` — `GLM_BASE_URL`
 embeds the pod ID. `/glm3:start` Step 6 does this and then verifies the launcher with a
 `codex-ok` round-trip.
+
+### Codex will prompt on every command unless BOTH of these are set
+
+This cost most of a day. Do not re-derive it, and do not remove either setting.
+
+Both live in one generated file, `glm-codex\.codex-home\config.toml` — the scoped
+`CODEX_HOME`. Not `~/.codex`, and not the directory you launch from.
+
+**1. Approval and sandbox, as a pair.**
+
+```toml
+approval_policy = "never"
+sandbox_mode    = "danger-full-access"
+```
+
+`approval_policy` alone does nothing. Codex derives a *permission profile* from the
+sandbox: `danger-full-access` gives `disabled` and `never` is honoured; `workspace-write`
+or `read-only` give `managed`, and the interactive TUI then promotes `never` to
+`on-request`, because escaping a managed sandbox requires approval to be possible.
+
+**2. Directory trust.**
+
+```toml
+[projects.'c:\users\you\code\yourproject']
+trust_level = "trusted"
+```
+
+Checked **before and independently of** the approval settings. An untrusted directory
+prompts before every command regardless of `approval_policy`. The key must be the native
+path — a Git Bash `/c/users/...` key never matches.
+
+**Why it broke at random:** Codex persists the trust entry itself once you approve a
+folder, but the launcher regenerates `config.toml` on every run and used to wipe it. Both
+launchers now merge existing `[projects.…]` entries. Preserve that if you touch them.
+
+**Ruled out — do not chase these again:** `default_permissions`, `[features]
+guardian_approval`, either `managed_config.toml` (ignored; the scoped one prints a
+deprecation warning), `CODEX_PERMISSION_PROFILE`,
+`--dangerously-bypass-approvals-and-sandbox`, `-a`/`-s` flags, `-c` overrides, ChatGPT
+Enterprise policy (not signed in), and the custom model. Each was tested by enabling every
+lever at once and removing them one at a time.
+
+**`codex exec` is not a valid test.** Exec cannot prompt, so it reports `never` under any
+sandbox and passes even when the TUI is broken. Verify interactively, and read the truth
+from the rollout log's `turn_context` (`approval_policy`, `sandbox_policy`,
+`permission_profile`) or `/debug-config` inside the TUI. The banner can say "YOLO mode"
+while the session actually runs `on-request`.
 
 Things that bite:
 
