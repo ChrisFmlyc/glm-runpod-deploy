@@ -64,8 +64,11 @@ running, or destroying deliberately, over an optimistic stop.
 
 ```bash
 K=$(python -c "print(open('.env').read().split('RUNPOD_API_KEY=')[1].split(chr(10))[0].strip())")
+# REST v2 returns {"pods":[...]}, NOT {"items":[...]}. Keying into ['items']
+# reads nothing and would make this look like "no pod to stop" while one is
+# live and billing. Use ['pods'].
 POD=$(curl -s "https://api.runpod.io/v2/pods" -H "Authorization: Bearer $K" \
-  | python -c "import json,sys; p=json.load(sys.stdin)['items']; print(p[0]['id'] if p else '')")
+  | python -c "import json,sys; p=json.load(sys.stdin).get('pods',[]); print(p[0]['id'] if p else '')")
 
 curl -sS -X POST "https://api.runpod.io/v2/pods/$POD/stop" -H "Authorization: Bearer $K"
 ```

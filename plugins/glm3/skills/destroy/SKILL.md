@@ -19,10 +19,28 @@ Irreversible. Stops **all** billing.
 
 Show exactly what will be destroyed and what it costs to rebuild:
 
+> **Two response-shape traps that once caused a live $18.36/hr pod to be
+> reported as "already gone".** REST `/v2/pods` nests the list under `pods`, not
+> `items` — keying into `['items']` reads nothing and hides a running pod. And
+> `/v2/networkvolumes` returns **404** — that REST path does not exist; volumes
+> only come from GraphQL. Both fixes are baked into the commands below. Do not
+> revert them to `['items']` or the REST volumes path.
+
 ```bash
 K=$(python -c "print(open('.env').read().split('RUNPOD_API_KEY=')[1].split(chr(10))[0].strip())")
-curl -s "https://api.runpod.io/v2/pods"           -H "Authorization: Bearer $K" | python -m json.tool
-curl -s "https://api.runpod.io/v2/networkvolumes" -H "Authorization: Bearer $K" | python -m json.tool
+
+# Pods: REST v2 returns {"pods":[...]}, NOT {"items":[...]}.
+curl -s "https://api.runpod.io/v2/pods" -H "Authorization: Bearer $K" | python -c "
+import json,sys
+pods=json.load(sys.stdin).get('pods',[])
+print('pods:', len(pods))
+for p in pods: print(' ', p['id'], p['name'], p.get('desiredStatus'), '\$'+str(p.get('costPerHr'))+'/hr')
+"
+
+# Network volumes: /v2/networkvolumes 404s — list via GraphQL.
+curl -s -X POST "https://api.runpod.io/graphql" -H "Authorization: Bearer $K" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query{myself{networkVolumes{id name size dataCenterId}}}"}' | python -m json.tool
 ```
 
 Tell them plainly:
@@ -46,7 +64,7 @@ schema error, the GraphQL equivalent is `podTerminate(input: {podId: "..."})`.
 
 ```bash
 POD=$(curl -s "https://api.runpod.io/v2/pods" -H "Authorization: Bearer $K" \
-  | python -c "import json,sys; p=json.load(sys.stdin)['items']; print(p[0]['id'] if p else '')")
+  | python -c "import json,sys; p=json.load(sys.stdin).get('pods',[]); print(p[0]['id'] if p else '')")
 
 curl -sS -X DELETE "https://api.runpod.io/v2/pods/$POD" -H "Authorization: Bearer $K" \
   -w '\nHTTP %{http_code}\n'
@@ -60,8 +78,14 @@ curl -sS -X DELETE "https://api.runpod.io/v2/pods/$POD" -H "Authorization: Beare
 $0.20/GB/month indefinitely. A 750 GB volume is ~$150/month for data nothing can reach.
 
 ```bash
-curl -s "https://api.runpod.io/v2/networkvolumes" -H "Authorization: Bearer $K" | python -m json.tool
-curl -sS -X DELETE "https://api.runpod.io/v2/networkvolumes/<VOLUME_ID>" -H "Authorization: Bearer $K"
+# List via GraphQL — the /v2/networkvolumes REST path 404s.
+curl -s -X POST "https://api.runpod.io/graphql" -H "Authorization: Bearer $K" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query{myself{networkVolumes{id name size dataCenterId}}}"}' | python -m json.tool
+
+# Delete each one by id (REST DELETE on a specific volume does work).
+curl -sS -X DELETE "https://api.runpod.io/v2/networkvolumes/<VOLUME_ID>" -H "Authorization: Bearer $K" \
+  -w '\nHTTP %{http_code}\n'
 ```
 
 A volume is only worth keeping if the user plans to redeploy **in that same datacenter**
@@ -75,8 +99,21 @@ Pod-local `persistent` mounts need no separate cleanup — they die with the pod
 Do not report success from the DELETE response alone. Prove it:
 
 ```bash
-curl -s "https://api.runpod.io/v2/pods"           -H "Authorization: Bearer $K" | python -c "import json,sys; print('pods   :', len(json.load(sys.stdin)['items']))"
-curl -s "https://api.runpod.io/v2/networkvolumes" -H "Authorization: Bearer $K" | python -c "import json,sys; print('volumes:', len(json.load(sys.stdin)['items']))"
+curl -s "https://api.runpod.io/v2/pods" -H "Authorization: Bearer $K" \
+  | python -c "import json,sys; print('pods   :', len(json.load(sys.stdin).get('pods',[])))"
+curl -s -X POST "https://api.runpod.io/graphql" -H "Authorization: Bearer $K" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query{myself{networkVolumes{id}}}"}' \
+  | python -c "import json,sys; print('volumes:', len(json.load(sys.stdin)['data']['myself']['networkVolumes']))"
+```
+
+Cross-check the pod count against GraphQL too — a wrong REST key is exactly what
+once masked a running pod:
+
+```bash
+curl -s -X POST "https://api.runpod.io/graphql" -H "Authorization: Bearer $K" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query{myself{pods{id name desiredStatus}}}"}' | python -m json.tool
 ```
 
 Both must be **0**. Report the totals explicitly.
