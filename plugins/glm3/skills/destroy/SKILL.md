@@ -27,7 +27,7 @@ curl -s "https://api.runpod.io/v2/networkvolumes" -H "Authorization: Bearer $K" 
 
 Tell them plainly:
 
-> This deletes the pod **and its 306 GiB of weights**. Rebuilding means a ~7 minute
+> This deletes the pod **and its 306 GiB of weights**. Rebuilding means a ~20 minute
 > re-download plus re-competing for 4× H200 capacity, which is not always immediately
 > available. Roughly 30 minutes and ~$10 to get back. Proceed?
 
@@ -37,9 +37,9 @@ deployment. Ask which resource they mean.
 
 ## API health note
 
-`DELETE /v2/pods/{id}` is **unaffected** by the upstream `objectMounts` bug that currently
-breaks pod *creation* (AGENTS.md BUG-13). Teardown works normally on REST v2 — only
-creation needs the GraphQL bypass. If a DELETE ever does fail with an `objectMounts` or
+`DELETE /v2/pods/{id}` is **unaffected** by the `objectMounts` bug that once broke pod
+*creation* (AGENTS.md BUG-13). Teardown works normally on REST v2. As of 2026-09-01 REST
+creation works again too, so the GraphQL bypass is a fallback rather than a requirement. If a DELETE ever does fail with an `objectMounts` or
 schema error, the GraphQL equivalent is `podTerminate(input: {podId: "..."})`.
 
 ## Terminate the pod
@@ -66,7 +66,7 @@ curl -sS -X DELETE "https://api.runpod.io/v2/networkvolumes/<VOLUME_ID>" -H "Aut
 
 A volume is only worth keeping if the user plans to redeploy **in that same datacenter**
 soon — volumes cannot move between regions, and a stranded volume in a region with no GPU
-capacity is pure cost. Re-downloading is 7 minutes; err toward deleting.
+capacity is pure cost. Re-downloading is ~20 minutes; err toward deleting.
 
 Pod-local `persistent` mounts need no separate cleanup — they die with the pod.
 
@@ -85,8 +85,8 @@ Both must be **0**. Report the totals explicitly.
 
 Mention, but do not do without asking:
 
-- `~/.config/opencode/opencode.jsonc` still points at a dead pod ID. It will fail until
-  the next deploy updates the baseURL. Harmless to leave.
+- The glm-codex launcher's `.env` (`glm-codex\.env`) still points at the dead pod. It
+  will fail until the next `/glm3:start` updates `GLM_BASE_URL`. Harmless to leave.
 - `GLM_API_KEY` in `.env` was only ever for that endpoint. Rotating it is optional, but
   note that vLLM logged it in plaintext, so treat it as exposed if the logs were shared.
 - The weights are gone. `/glm3:start` rebuilds from scratch.

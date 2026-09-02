@@ -1,9 +1,15 @@
 {
   "name": "glm3",
   "version": "1.0.0",
-  "description": "Lifecycle management for a self-hosted GLM-5.3-Flash endpoint on RunPod.",
+  "description": "Deploy and serve a self-hosted GLM-5.3-Flash UNCENSORED endpoint on RunPod for the glm-codex Codex launcher.",
   "author": {
     "name": "Chris Powell"
   },
-  "keywords": ["glm", "runpod", "vllm", "inference", "opencode"]
+  "keywords": [
+    "glm",
+    "runpod",
+    "vllm",
+    "inference",
+    "codex"
+  ]
 }

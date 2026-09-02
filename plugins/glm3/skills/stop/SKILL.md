@@ -32,7 +32,7 @@ The asymmetry that matters:
 | Restart after stop | 4 free H200s on **that one machine** |
 | Fresh deploy | 4 free H200s on **any machine in the network** |
 
-A fresh deploy has far better odds. Re-downloading the weights is only ~7 minutes.
+A fresh deploy has far better odds. Re-downloading the weights is ~20 minutes.
 
 **Also tell them:** stopping is not free. Volume disk bills at $0.20/GB/month —
 a 420 GB mount is ~$84/month, about **$2.76/day**, while stopped. And a restart still
@@ -51,13 +51,14 @@ Check `mounts` on the pod and say so explicitly if it is `persistent`.
 
 ## API health note
 
-As of 2026-08-28, `POST /v2/pods` is broken upstream with an `objectMounts` schema error
-(AGENTS.md BUG-13) — **pod creation** must go through GraphQL. Stop, read, PATCH and DELETE
-on REST v2 are unaffected.
+`POST /v2/pods` was broken upstream with an `objectMounts` schema error (AGENTS.md BUG-13),
+forcing pod creation through GraphQL. **REST creation worked normally on 2026-09-01**, so
+treat GraphQL as the fallback rather than the required path. Stop, read, PATCH and DELETE
+on REST v2 have always been unaffected.
 
-This raises the stakes on stopping: if the restart yields a zero-GPU pod and you have to
-rebuild, creation is currently the one operation that needs a workaround. Prefer keeping
-the pod running, or destroying deliberately, over an optimistic stop.
+That lowers the stakes on a failed restart slightly — a rebuild no longer needs a
+workaround — but the capacity risk below is the real reason to prefer keeping the pod
+running, or destroying deliberately, over an optimistic stop.
 
 ## Do it
 
@@ -82,5 +83,5 @@ curl -s "https://api.runpod.io/v2/pods/$POD" -H "Authorization: Bearer $K" | pyt
 Report: pod ID, that GPU billing has stopped, ongoing disk cost per day, and that
 restarting takes ~25 minutes and is not guaranteed to get GPUs back.
 
-Remind them the OpenCode endpoint will return **bad gateway** until it is running again —
-that is expected, not a config fault.
+Remind them the glm-codex launcher will get **bad gateway / 404** from the endpoint until
+the pod is running again — that is expected, not a config fault.

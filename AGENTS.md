@@ -1,7 +1,7 @@
 # AGENTS.md — GLM-5.3-Flash on RunPod
 
-Operational repo for deploying **GLM-5.3-Flash** (and its uncensored variant) as a
-private OpenAI-compatible inference endpoint on RunPod, consumed locally by OpenCode.
+Operational repo for deploying the **GLM-5.3-Flash UNCENSORED** build as a private
+OpenAI-compatible inference endpoint on RunPod, consumed by the glm-codex Codex launcher.
 
 There is no application code here. This repo is **runbook + deploy payloads + skills**.
 
@@ -17,7 +17,7 @@ There is no application code here. This repo is **runbook + deploy payloads + sk
 | Read the full human guide | `glm53-deployment-guide.html` |
 
 **This repo deploys the uncensored build, and only the uncensored build.**
-`dealignai/GLM-5.3-Flash-UNCENSORED-FP8` — never the base `zai-org/GLM-5.3-Flash`.
+`orcarouter/GLM-5.3-Flash-Uncensored-FP8` — never any other build.
 Not as a fallback, not for debugging, not temporarily. If the uncensored build fails,
 report the failure rather than substituting a different model: a healthy endpoint serving
 the wrong weights is a failed deployment.
@@ -112,12 +112,13 @@ releasing it between steps means re-competing for it.
 
 ```
 1. POST /v2/pods  with runpod/pytorch image   → get a shell
-2. SSH in, download 306 GiB to /workspace     → ~7 min
+2. SSH in, download 306 GiB to /workspace     → ~20 min
 3. PATCH image + args to vLLM                 → same pod, same GPUs, same ID
 4. Poll /v1/models until 200                  → ~15-20 min
 ```
 
-The pod ID never changes, so the OpenCode base URL stays valid throughout.
+The pod ID never changes across the image swap, so the launcher base URL stays valid
+throughout a single deploy.
 
 **Always deploy the uncensored build.** It has been run successfully on this exact stack —
 it loaded and served first time, 75.65 GiB per worker, passing chat, tool-calling and auth
@@ -273,66 +274,36 @@ container disk and is wiped on restart.
 
 ---
 
-## Connecting OpenCode
+## The client: glm-codex launcher
 
-Two files joined by the provider ID `runpod-glm`. Neither discovers the other.
-
-| File | Holds |
-|---|---|
-| `~/.config/opencode/opencode.jsonc` | baseURL + model list |
-| `~/.local/share/opencode/auth.json` | the API key |
-
-After every deploy, **update the baseURL** — it embeds the pod ID:
+**Codex only.** There is no OpenCode path and no Claude Code path — both were removed. The
+one true launcher is **glm-codex**, a separate repo:
 
 ```
-https://<POD_ID>-8000.proxy.runpod.net/v1
+C:\Users\ChrisPowell\code\glm-codex
+  scripts/codex-glm.ps1   scripts/codex-glm.sh
 ```
 
-Keep `limit.context` equal to the server's `--max-model-len`. If the client advertises
-more than the server accepts, requests fail *mid-conversation* once context accumulates.
+It reads its own `.env` (`GLM_BASE_URL`, `GLM_API_KEY`, `GLM_MODEL_NAME`), regenerates a
+scoped Codex config on each run, and connects straight to the Responses API (no proxy).
 
-Only list models the server actually serves — OpenCode does not validate the list, and a
-stale entry returns `The model 'x' does not exist` (404).
+After every deploy, the only thing to update is that launcher's `.env` — `GLM_BASE_URL`
+embeds the pod ID. `/glm3:start` Step 6 does this and then verifies the launcher with a
+`codex-ok` round-trip.
 
-OpenCode does **not** reload config live. Tell the user to fully quit and relaunch.
+Things that bite:
 
----
-
-## Clients
-
-Two are wired up. Both need the pod ID after every redeploy, since it is embedded in the URL.
-
-| Client | Config | Context setting |
-|---|---|---|
-| OpenCode | `~/.config/opencode/opencode.jsonc` | `models.<id>.limit.context` |
-| Claude Code (via LiteLLM) | `litellm/config.yaml` | `model_info.max_input_tokens` |
-
-**Claude Code cannot reach the endpoint directly** — it speaks the Anthropic Messages API,
-vLLM speaks OpenAI. `litellm/` holds a proxy that translates between them; see
-`docs/claude-code-litellm-guide.html`. Start it with `litellm/start-proxy.ps1`, then launch
-Claude Code against it with `litellm/claude-glm.ps1`.
-
-**Every client declares its own context limit and nothing reconciles them.** Four values
-must agree: vLLM's `--max-model-len` (the only enforced one), LiteLLM's
-`model_info.max_input_tokens`, the client's own setting, and — for Claude Code —
-`CLAUDE_CODE_MAX_CONTEXT_TOKENS`. Lower than the server wastes the window silently;
-higher fails mid-conversation once context accumulates.
-
-**Claude Code ignores LiteLLM's `model_info` entirely.** It resolves the context window
-from its own internal model list; an unrecognised name like `glm53` gets a small assumed
-window and aggressive auto-compaction. The symptom is sessions running out of context far
-too quickly, with no error. Set `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
-`CLAUDE_CODE_MAX_OUTPUT_TOKENS` in the launcher — `litellm/claude-glm.ps1` does this.
-
-Windows traps that cost real time — all in the LiteLLM guide:
-
-- **`.ps1` and `config.yaml` must be pure ASCII.** PowerShell reads scripts without a BOM
-  as cp1252; a single em-dash produces `The string is missing the terminator` pointing at a
-  line that is fine. The reported line is where the parser gave up, not where the bad byte is.
-- **Set `PYTHONUTF8=1`** before starting LiteLLM or its Unicode banner kills startup.
-- **LiteLLM silently binds a random port** if its `--port` is taken. Always check the
-  `Uvicorn running on` line, and kill stale instances with
-  `Get-Process -Name litellm | Stop-Process -Force` — `pkill` does not work reliably here.
+- **The served name is `glm53-uncensored`.** Requesting `glm53` returns
+  `The model 'glm53' does not exist` (404). The launcher passes the model explicitly.
+- **A running Codex session holds its old config.** Relaunch after a redeploy or it keeps
+  hitting the previous pod.
+- **Refusals are a reasoning-mode setting, not the model.** This build is fully uncensored
+  at reasoning **off** or **max**; intermediate effort keeps some refusals by design.
+- **Codex context is capped near 258K** for a custom provider regardless of the configured
+  window (upstream bug openai/codex#19185).
+- **`.ps1` must be pure ASCII.** PowerShell reads a BOM-less script as cp1252; one em-dash
+  produces `The string is missing the terminator` pointing at a line that is fine — the
+  reported line is where the parser gave up, not where the bad byte is.
 
 ## Stop vs terminate
 
@@ -347,7 +318,7 @@ only. It does not queue or wait.
 | Restart after stop | 4 free H200s on **that one machine** |
 | Fresh deploy | 4 free H200s on **any machine in the network** |
 
-The second has far better odds. Re-downloading is only 7 minutes. Stopping also still bills
+The second has far better odds. Re-downloading is ~20 minutes. Stopping also still bills
 ~$2.76/day for the disk and still needs ~25 min to serve.
 
 Stop only if returning within hours.
@@ -385,9 +356,9 @@ deploy/
   pod-downloader.json            cheap single-GPU pod for weight downloads
   capacity-probe.json            multi-datacenter probe to find free GPUs
 scripts/
+  swap-to-vllm.sh                hot-swap a pod to vLLM (serve the model)
+  swap-to-pytorch.sh             swap back to a shell image (manage weights)
   test-endpoint.sh               smoke test: /models, a completion, a 401 check
-config/
-  opencode.json.example          OpenCode provider block; set your pod ID
 plugins/glm3/
   skills/{start,stop,destroy}/   the lifecycle skills
 archive/                         one-off scripts and logs from the original build

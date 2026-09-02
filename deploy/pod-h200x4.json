@@ -33,5 +33,5 @@
       }
     ]
   },
-  "args": "--model /workspace/models/GLM-5.3-Flash --served-model-name glm53 --tensor-parallel-size 4 --max-model-len 65536 --api-key YOUR_SECRET_KEY --enable-auto-tool-choice --tool-call-parser glm47 --reasoning-parser glm45 --host 0.0.0.0 --port 8000"
+  "args": "--model /workspace/models/GLM-5.3-UNCENSORED --served-model-name glm53-uncensored --tensor-parallel-size 4 --max-model-len 65536 --api-key YOUR_SECRET_KEY --enable-auto-tool-choice --tool-call-parser glm47 --reasoning-parser glm45 --host 0.0.0.0 --port 8000"
 }
