@@ -12,7 +12,7 @@ curl -sS "$BASE/models" -H "Authorization: Bearer $KEY" | python -m json.tool
 echo "=== 2. chat ==="
 curl -sS "$BASE/chat/completions" -H "Authorization: Bearer $KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"model":"glm53","messages":[{"role":"user","content":"Reply with exactly: it works"}],"max_tokens":32}' \
+  -d '{"model":"glm53-uncensored","messages":[{"role":"user","content":"Reply with exactly: it works"}],"max_tokens":32}' \
   | python -m json.tool
 
 echo "=== 3. auth rejects a bad key (should be 401) ==="

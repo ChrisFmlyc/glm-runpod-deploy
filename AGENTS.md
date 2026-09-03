@@ -270,6 +270,19 @@ fault. Do not confuse them: the first is worth retrying, the second never is.
 
 Retest REST periodically — when it starts working, prefer it.
 
+**BUG-14 — REST list-response shapes that silently hide resources.** Two traps that once
+made `/glm3:destroy` report "0 pods" while a 4× H200 pod was RUNNING at $18.36/hr:
+
+- `GET /v2/pods` returns `{"pods": [...]}`, **not** `{"items": [...]}`. Keying into
+  `['items']` KeyErrors, and `.get('items', [])` silently reads an empty list — so a live
+  pod looks like none, and a "verify zero" step gives a false all-clear. Use `['pods']`.
+- `GET /v2/networkvolumes` returns **404** — that REST path does not exist. List volumes
+  via GraphQL (`query{myself{networkVolumes{id name size dataCenterId}}}`). Deleting a
+  volume by id (`DELETE /v2/networkvolumes/<id>`) does work; only the collection GET 404s.
+
+→ Always cross-check pod/volume counts against GraphQL (`myself{pods{...} networkVolumes{...}}`)
+before reporting anything destroyed. A wrong REST key is exactly what masks a running pod.
+
 **BUG-12 — restarts are 25× slower than first boot.** First load reads from page cache
 (~37s); any later start is a cold 306 GiB read (~13.5 min). The kernel-JIT cache lives on
 container disk and is wiped on restart.
@@ -426,10 +439,12 @@ before sending. Never write a real key back into these files.
 
 Honesty about provenance, so nothing here is trusted more than it deserves:
 
-- **Executed and verified**: `POST/PATCH/GET/DELETE /v2/pods`, SSH + `hf download`,
-  all `/v1` endpoint checks, both bug fixes, 1M context.
-- **From documentation, not executed**: RunPod console click-paths,
-  `/v2/networkvolumes` endpoints, `runpodctl` (never used).
+- **Executed and verified**: `POST/PATCH/GET/DELETE /v2/pods`, GraphQL pod create +
+  `myself{pods,networkVolumes}`, SSH + `hf download` (62 shards / 306 GiB), all `/v1`
+  endpoint checks, all bug fixes (incl. BUG-14), 1M context. `/v2/networkvolumes` GET
+  confirmed **404** (BUG-14) — volumes are listed via GraphQL.
+- **From documentation, not executed**: RunPod console click-paths, `runpodctl` (never
+  used).
 - **Not done**: no vLLM source audit. BUG-01 and BUG-02 root causes are inferred from a
   traceback and an error string, and were never confirmed against the code or by a
   maintainer, nor checked against the upstream issue tracker.
