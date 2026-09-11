@@ -26,17 +26,30 @@ curl -sS -X PATCH "https://api.runpod.io/v2/pods/${POD}" \
 rm -f ./.vllm-patch.json
 
 # Verify against a FRESH GET, not the PATCH response: the PATCH reply returns
-# before `args` is fully populated and reports spurious MISSING flags.
-sleep 3
-curl -sS "https://api.runpod.io/v2/pods/${POD}" -H "Authorization: Bearer ${RP}" | python -c "
-import sys,json
-d=json.load(sys.stdin); a=d.get('args','')
-md=sys.argv[1]
-print('image        :', d.get('image'))
-print('status       :', d.get('status'))
-print('model dir    :', 'OK' if ('--model '+md) in a else 'MISSING')
-print('served name  :', 'OK' if '--served-model-name glm53-uncensored' in a else 'MISSING')
-print('max-num-seqs :', 'OK' if '--max-num-seqs 256' in a else 'MISSING')
-print('max-model-len:', 'OK' if '--max-model-len 1048576' in a else 'MISSING')
-if not a: print('WARN: args still empty on GET - re-run this check in a few seconds')
-" "$MODEL_DIR"
+# before `args` is populated, and the GET itself lags 20-30s and may briefly
+# echo a partial string. So POLL the GET until --model appears, then check.
+#
+# All substring checks are done in BASH (`case`), never by passing MODEL_DIR to
+# python. Under Git Bash, a value starting with "/" (like /workspace/...) passed
+# as argv/env to native Windows python is rewritten by MSYS path conversion to
+# "C:/Program Files/Git/workspace/..." - which made the check report a spurious
+# "model dir: MISSING" while the pod was configured correctly. `case` in bash
+# does no such conversion. (The --model value sent to the pod is unaffected: it
+# is mid-string in ARGS, not a leading-slash argument.)
+echo "waiting for args to populate on the pod..."
+a=""; img=""
+for _ in $(seq 1 20); do
+  resp=$(curl -sS "https://api.runpod.io/v2/pods/${POD}" -H "Authorization: Bearer ${RP}")
+  a=$(printf '%s' "$resp"   | python -c "import sys,json; print(json.load(sys.stdin).get('args','') or '')")
+  img=$(printf '%s' "$resp" | python -c "import sys,json; print(json.load(sys.stdin).get('image','') or '')")
+  case "$a" in *"--model ${MODEL_DIR}"*) break ;; esac
+  sleep 5
+done
+
+chk() { case "$a" in *"$1"*) echo OK ;; *) echo MISSING ;; esac; }
+echo "image        : $img"
+echo "model dir    : $(chk "--model ${MODEL_DIR}")"
+echo "served name  : $(chk "--served-model-name glm53-uncensored")"
+echo "max-num-seqs : $(chk "--max-num-seqs 256")"
+echo "max-model-len: $(chk "--max-model-len 1048576")"
+[ -z "$a" ] && echo "WARN: args still empty after polling - check the pod manually"
